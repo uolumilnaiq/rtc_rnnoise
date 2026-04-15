@@ -1,0 +1,56 @@
+# Flutter related
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android related
+android/**/generated/
+android/app/src/main/res/drawable-*/
+android/local.properties
+android/.gradle/
+android/.cxx/
+android/*.iml
+android/build/
+*.aar
+*.jar
+*.jks
+
+# iOS related
+ios/.DS_Store
+ios/Pods/
+ios/Podfile.lock
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+*.xcworkspace
+*.xcscheme
+*.xscheduleresult
+*.xcresult
+
+# C++ / Native artifacts
+**/*.so
+**/*.a
+**/*.o
+**/*.obj
+**/*.pyc
+.libs/
+.deps/
+src/cpp/third_party/rnnoise/src/config.h
+src/cpp/third_party/speexdsp/config.h
+
+# IDE related
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+example/rnnoise_test.log
