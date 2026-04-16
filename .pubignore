@@ -8,17 +8,22 @@ build/
 android/.gradle/
 android/local.properties
 android/build/
+android/build_native/
+android/build_v7a/
+android/build_x86_64/
 ios/Pods/
 ios/.DS_Store
 ios/DerivedData/
+ios/build_ios/
+ios/build_sim/
 .dart_tool/
+
+# IMPORTANT: Exclude large C++ source code in Option B
+# We only publish the JNI bridges and the compiled binaries
+# But we keep the headers for compilation reference in podspec/gradle if needed
+src/cpp/**/*.c
+src/cpp/**/*.cpp
 
 # Temporary files
 .DS_Store
 *.log
-
-# Test-related if you don't want them in the package (optional)
-# test/
-
-# Example folder is USUALLY included but can be excluded if you want to keep the package small. 
-# However, pub.dev likes examples to be included.

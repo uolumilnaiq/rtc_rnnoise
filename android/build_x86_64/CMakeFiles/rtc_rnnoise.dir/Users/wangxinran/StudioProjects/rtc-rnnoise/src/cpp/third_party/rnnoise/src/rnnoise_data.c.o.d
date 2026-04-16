@@ -1,0 +1,21 @@
+CMakeFiles/rtc_rnnoise.dir/Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/rnnoise_data.c.o: \
+  /Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/rnnoise_data.c \
+  /Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/config.h \
+  /Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/rnnoise_data.h \
+  /Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/nnet.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/stddef.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_ptrdiff_t.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_size_t.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_wchar_t.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_null.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_max_align_t.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/__stddef_offsetof.h \
+  /Users/wangxinran/StudioProjects/rtc-rnnoise/src/cpp/third_party/rnnoise/src/opus_types.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/lib/clang/18/include/stdint.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/stdint.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/bits/wchar_limits.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/sys/cdefs.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/android/versioning.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/android/api-level.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/bits/get_device_api_level_inlines.h \
+  /Users/wangxinran/Library/Android/sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/usr/include/android/ndk-version.h
