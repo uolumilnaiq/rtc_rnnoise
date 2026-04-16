@@ -1,43 +1,44 @@
-# rtc_rnnoise
+# RtcRnnoise
 
-一个专为 Flutter WebRTC 打造的工业级高性能 AI 降噪插件。基于 [RNNoise](https://github.com/xiph/rnnoise) 原生 C 内核，通过原生层注入（Native Injection）实现极致的低延迟音频增强。
+**RtcRnnoise** is a high-performance, industrial-grade AI noise reduction plugin specifically designed for [Flutter WebRTC](https://github.com/flutter-webrtc/flutter-webrtc). 
 
-## 🌟 核心特性
+It leverages the [RNNoise](https://github.com/xiph/rnnoise) C core and achieves ultra-low latency audio enhancement through **Native Injection** into the WebRTC processing pipeline.
 
-*   **极致性能**：在 C++ 层闭环处理，绕过 Flutter UI 线程，零延迟感知。
-*   **数学级对齐**：直通 10ms 音频处理流，移除 RingBuffer 以消除额外延迟。
-*   **智能适配**：自动识别 Float32/Int16 格式，完美兼容 WebRTC 多态数据流。
-*   **AI 人声检测**：实时输出 VAD (Voice Activity Detection) 概率，支持 UI 联动。
-*   **干湿混合**：支持降噪强度（Dry/Wet Mix）调节，平衡音质与降噪效果。
+## 🌟 Key Features
 
-## 📊 平台支持状态
+*   **Native-Level Performance**: Processing occurs entirely within the C++ layer, bypassing the Flutter UI thread for zero perceived latency.
+*   **Mathematical Sample Alignment**: Designed for 10ms frame processing to perfectly align with WebRTC's internal engine.
+*   **Zero-Copy RingBuffer**: Eliminates the overhead and latency of traditional RingBuffers by processing audio frames directly in-place.
+*   **Intelligent Auto-Adaptation**: Seamlessly handles Float32/Int16 formats and various sample rates (optimized for 48kHz).
+*   **Real-time VAD Feedback**: Provides AI-based Voice Activity Detection (VAD) probability, allowing for dynamic UI indicators.
+*   **Dry/Wet Mix Control**: Tune the suppression intensity (0.0 to 1.0) to balance noise removal with natural voice quality.
 
-| 平台 | 状态 | 备注 |
+## 📊 Platform Support
+
+| Platform | Status | Implementation Detail |
 | :--- | :--- | :--- |
-| **Android** | ✅ 已验证 | 已在真机通过 WebRTC Loopback 测试，运行稳定。 |
-| **iOS** | ⚠️ 待验证 | 代码架构已对齐，环境搭建已就绪，等待真机测试。 |
+| **Android** | ✅ Stable | Native JNI Injection into `AudioProcessingAdapter`. |
+| **iOS** | 🛠️ In Progress | Architecture defined; awaiting full platform-specific implementation. |
 
 ---
 
-## 🚀 集成指南
+## 🚀 Integration Guide
 
-### 1. 引用插件
+### 1. Installation
 
-在你的 `pubspec.yaml` 中添加引用：
+Add the plugin to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
   rtc_rnnoise:
     git:
-      url: https://github.com/你的用户名/rtc_rnnoise.git
+      url: https://github.com/your-repo/rtc_rnnoise.git
       ref: main
 ```
 
-### 2. Android 端配置 (必须)
+### 2. Android Configuration (Required)
 
-由于该插件采用“原生注入”模式，你需要在宿主应用的 `MainActivity.kt` 中手动挂载处理器。
-
-在 `MainActivity.kt` 中添加以下逻辑：
+To enable **Native Injection**, you must manually link the noise processor to the WebRTC engine in your `MainActivity.kt`.
 
 ```kotlin
 import com.rtc.rnnoise.RnnoiseProcessor
@@ -45,85 +46,92 @@ import com.rtc.rnnoise.rtc_rnnoise.RtcRnnoisePlugin
 import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin
 import com.cloudwebrtc.webrtc.audio.AudioProcessingAdapter
 import java.nio.ByteBuffer
-import android.os.Handler
-import android.os.Looper
 
-class MainActivity: FlutterActivity() {
-    private var rnnoiseProcessor: RnnoiseProcessor? = null
+class MainActivity : FlutterActivity(), RtcRnnoisePlugin.AttachProvider {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        // 1. 初始化降噪处理器并关联到插件
-        val processor = RnnoiseProcessor()
-        rnnoiseProcessor = processor
-        RtcRnnoisePlugin.activeProcessor = processor
+        // Register this activity as the provider for 'attach' calls
+        RtcRnnoisePlugin.attachProvider = this
+    }
+
+    /**
+     * Implementation of RtcRnnoisePlugin.AttachProvider.
+     * This is called when RtcRnnoise.attach() is invoked in Dart.
+     */
+    override fun onAttach(): Boolean {
+        val controller = FlutterWebRTCPlugin.sharedSingleton?.audioProcessingController ?: return false
         
-        // 2. 轮询注入 WebRTC 音频管道 (Post-AEC 节点)
-        val handler = Handler(Looper.getMainLooper())
-        val runnable = object : Runnable {
-            override fun run() {
-                val controller = FlutterWebRTCPlugin.sharedSingleton?.audioProcessingController
-                if (controller != null) {
-                    controller.capturePostProcessing.addProcessor(object : AudioProcessingAdapter.ExternalAudioFrameProcessing {
-                        override fun initialize(rate: Int, channels: Int) = processor.initialize(rate, channels)
-                        override fun reset(rate: Int) = processor.reset(rate)
-                        override fun process(bands: Int, frames: Int, buffer: ByteBuffer) = processor.process(bands, frames, buffer)
-                    })
-                    return 
-                }
-                handler.postDelayed(this, 1000)
-            }
-        }
-        handler.post(runnable)
+        // Inject RnnoiseProcessor into the Capture Post-Processing node
+        val processor = RtcRnnoisePlugin.activeProcessor ?: RnnoiseProcessor()
+        RtcRnnoisePlugin.activeProcessor = processor
+
+        controller.capturePostProcessing.addProcessor(object : AudioProcessingAdapter.ExternalAudioFrameProcessing {
+            override fun initialize(rate: Int, channels: Int) = processor.initialize(rate, channels)
+            override fun reset(rate: Int) = processor.reset(rate)
+            override fun process(bands: Int, frames: Int, buffer: ByteBuffer) = processor.process(bands, frames, buffer)
+        })
+        
+        return true
     }
 }
 ```
 
-### 3. WebRTC 调用约束 (关键)
+### 3. WebRTC Constraints (Critical)
 
-在 Flutter 侧调用 `getUserMedia` 时，必须显式**关闭 WebRTC 原生降噪**，否则会产生双重处理导致的机械音。
+When requesting user media, you **must disable** WebRTC's built-in noise suppression to avoid "double-processing," which can cause robotic-sounding audio.
 
 ```dart
 final Map<String, dynamic> constraints = {
   'audio': {
-    'googNoiseSuppression': false, // 必须设为 false
-    'googEchoCancellation': true,  // 建议保留 AEC
+    'googNoiseSuppression': false, // Disable native NS
+    'googEchoCancellation': true,  // Keep AEC enabled
     'echoCancellation': true,
   },
-  'video': false,
+  'video': true,
 };
 ```
 
 ---
 
-## 🛠️ Dart API 示例
+## 🛠️ Dart API Usage
 
+### Basic Setup
 ```dart
 import 'package:rtc_rnnoise/rtc_rnnoise.dart';
 
-// 初始化
+// Initialize the native core
 await RtcRnnoise.init();
 
-// 开启/关闭降噪
+// Attach to the WebRTC pipeline after getUserMedia()
+bool attached = await RtcRnnoise.attach();
+```
+
+### Real-time Controls
+```dart
+// Enable or bypass noise reduction
 await RtcRnnoise.setEnabled(true);
 
-// 调节强度 (0.0 ~ 1.0)
+// Set suppression intensity (0.0 to 1.0)
 await RtcRnnoise.setSuppressionLevel(0.8);
+```
 
-// 监听实时人声检测 (VAD)
-RtcRnnoise.vadStream.listen((vad) {
-  print("当前人声概率: ${vad * 100}%");
+### Voice Activity Detection (VAD)
+```dart
+// Monitor real-time speech probability
+RtcRnnoise.vadStream.listen((probability) {
+  print("Voice Probability: ${(probability * 100).toStringAsFixed(1)}%");
 });
 ```
 
 ---
 
-## 📝 许可证 (License)
+## 📝 License
 
-本项目采用 **BSD 3-Clause License**。
+This project is licensed under the **BSD 3-Clause License**.
 
-### 依赖项声明：
-本插件包含了以下遵循 BSD 3-Clause 许可的开源组件：
+### Acknowledgments
+This plugin incorporates the following open-source components:
 *   **RNNoise**: Copyright (c) Xiph.Org Foundation.
 *   **SpeexDSP**: Copyright (c) Xiph.Org Foundation.
