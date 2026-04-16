@@ -15,24 +15,22 @@ class RtcRnnoisePlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHan
   private lateinit var methodChannel : MethodChannel
   private lateinit var eventChannel : EventChannel
   
+  interface AttachProvider {
+    fun onAttach() : Boolean
+  }
+
   companion object {
     var activeProcessor: RnnoiseProcessor? = null
     var eventSink: EventChannel.EventSink? = null
+    var attachProvider: AttachProvider? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     @JvmStatic
     fun sendVadUpdate(vad: Float) {
       if (eventSink == null) return
-      
-      // 过滤掉非法数值，防止 Dart 端接收到溢出值
       if (vad.isNaN() || vad < 0.0 || vad > 1.0) return
-
       mainHandler.post {
-        try {
-          eventSink?.success(vad.toDouble())
-        } catch (e: Exception) {
-          Log.e("RNNoise-Plugin", "Failed to send VAD: ${e.message}")
-        }
+        eventSink?.success(vad.toDouble())
       }
     }
   }
@@ -46,8 +44,19 @@ class RtcRnnoisePlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHan
   }
 
   override fun onMethodCall(call: MethodCall, result: Result) {
+    Log.i("RNNoise-Plugin", "CRITICAL: onMethodCall received -> ${call.method}")
     when (call.method) {
-      "init" -> result.success(null)
+      "init" -> {
+        if (activeProcessor == null) {
+          activeProcessor = RnnoiseProcessor()
+        }
+        result.success(null)
+      }
+      "attach" -> {
+        // 核心：由宿主提供的 Provider 执行真正的 attach
+        val success = attachProvider?.onAttach() ?: false
+        result.success(success)
+      }
       "setEnabled" -> {
         val enabled = call.argument<Boolean>("enabled") ?: true
         activeProcessor?.setEnabled(enabled)
@@ -62,13 +71,8 @@ class RtcRnnoisePlugin: FlutterPlugin, MethodCallHandler, EventChannel.StreamHan
     }
   }
 
-  override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-    eventSink = events
-  }
-
-  override fun onCancel(arguments: Any?) {
-    eventSink = null
-  }
+  override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { eventSink = events }
+  override fun onCancel(arguments: Any?) { eventSink = null }
 
   override fun onDetachedFromEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     methodChannel.setMethodCallHandler(null)
