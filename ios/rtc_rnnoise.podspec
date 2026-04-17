@@ -11,14 +11,13 @@ Features real-time VAD and zero-latency native audio processing via pre-compiled
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }
   
-  # Only headers are needed for the public package if using vendored library
   s.source_files = 'Classes/**/*', '../src/cpp/**/*.{h,hpp}'
   
   s.dependency 'Flutter'
   s.platform = :ios, '12.0'
 
-  # Vendored library
-  s.vendored_libraries = 'libs/librtc_rnnoise.a'
+  # 使用 XCFramework，支持真机 (iphoneos) 和 M3 模拟器 (iphonesimulator)
+  s.vendored_frameworks = 'libs/rtc_rnnoise.xcframework'
 
   s.pod_target_xcconfig = { 
     'DEFINES_MODULE' => 'YES', 
