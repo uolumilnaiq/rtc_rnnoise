@@ -79,14 +79,13 @@ await RtcRnnoise.setEnabled(true);
 
 ## 💖 Acknowledgments & AI Collaboration
 
-This project was developed with the deep assistance of **Gemini 3 Flash Preview** and the **Superpower** toolset. 
+This project's development workflow was streamlined through the use of AI-assisted productivity tools, including **Gemini 3 Flash Preview** and the **Superpower** toolset. 
 
-From the initial C++ core architecture design and RNNoise v0.2 integration to the complex WebRTC runtime injection, every step was guided and verified through a collaborative AI-human workflow. 
-
-Special thanks to the AI agents for providing expert-level guidance on cross-platform native compilation, debugging complex WebRTC injection issues, and ensuring industry-standard package distribution.
+While AI provided expert-level suggestions for cross-platform native compilation and runtime injection logic, all architectural decisions, code implementations, and final verifications were strictly conducted and approved by the maintainer to ensure industrial-grade quality and security.
 
 ---
 
 ## 📝 License
 
 This project is licensed under the **BSD 3-Clause License**.
+

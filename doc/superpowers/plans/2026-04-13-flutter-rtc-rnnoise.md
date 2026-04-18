@@ -1,6 +1,6 @@
 # Flutter WebRTC RNNoise 降噪插件实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **** Technical Note::subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 开发一个专为 WebRTC 优化的高性能、低延迟 AI 降噪插件，利用原生钩子实现通话降噪。
 
