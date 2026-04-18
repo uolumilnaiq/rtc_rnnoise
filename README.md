@@ -17,10 +17,10 @@ It leverages the [RNNoise](https://github.com/xiph/rnnoise) C core and achieves 
 
 This plugin is a bridge to high-quality open-source audio processing engines. We stand on the shoulders of giants:
 
-| Library | Version | License | Role |
+| Library | Version / Commit | License | Role |
 | :--- | :--- | :--- | :--- |
-| **[RNNoise](https://github.com/xiph/rnnoise)** | Latest (Git) | BSD 3-Clause | Core AI noise reduction & VAD engine. |
-| **[SpeexDSP](https://github.com/xiph/speexdsp)** | 1.2.1 | BSD 3-Clause | Pre-processing, Resampling, and Gain control. |
+| **[RNNoise](https://github.com/xiph/rnnoise)** | `5a3a59e` (2024-03) | BSD 3-Clause | Core AI noise reduction & VAD engine. |
+| **[SpeexDSP](https://github.com/xiph/speexdsp)** | `1.2.1` | BSD 3-Clause | Pre-processing, Resampling, and Gain control. |
 
 ---
 
