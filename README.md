@@ -6,12 +6,18 @@ It leverages the [RNNoise](https://github.com/xiph/rnnoise) C core and achieves 
 
 ## 🌟 Key Features
 
-*   **Pre-compiled Binaries**: Ship with optimized `.so` and `.a` files for all major architectures. No complex build setup required for end users.
+*   **Pre-compiled Binaries**: Ship with optimized `.so` and `XCFramework` for all major architectures.
 *   **Native-Level Performance**: Processing occurs entirely within the C++ layer, bypassing the Flutter UI thread.
 *   **Mathematical Sample Alignment**: Designed for 10ms frame processing to perfectly align with WebRTC's internal engine.
 *   **Zero-Copy Direct Injection**: Injected into the `AudioProcessingAdapter` of WebRTC for the lowest possible latency.
 *   **Real-time VAD Feedback**: Provides AI-based Voice Activity Detection (VAD) probability.
-*   **Dry/Wet Mix Control**: Tune the suppression intensity (0.0 to 1.0).
+
+## 📊 Platform Support
+
+| Platform | Status | Implementation Detail |
+| :--- | :--- | :--- |
+| **Android** | ✅ Stable | Native JNI Injection. Fully verified on physical devices. |
+| **iOS** | ⚠️ Limited | Architecture ready (XCFramework), but **does not work on Simulators** due to WebRTC SDK limitations. Requires physical device for verification. |
 
 ## 🏛️ Third-party Libraries & Credits
 

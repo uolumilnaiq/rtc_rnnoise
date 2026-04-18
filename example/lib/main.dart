@@ -28,7 +28,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // 建立持久监听
     _startVadListening();
   }
 
@@ -36,18 +35,16 @@ class _MyAppState extends State<MyApp> {
     _vadSubscription?.cancel();
     _vadSubscription = RtcRnnoise.vadStream.listen(
       (vad) {
-        if (mounted) {
-          setState(() => _currentVad = vad);
-        }
+        if (mounted) setState(() => _currentVad = vad);
       },
       onError: (err) => debugPrint('VAD Stream Error: $err'),
     );
-    debugPrint('Dart: Started listening to VAD stream');
   }
 
   @override
   void dispose() {
     _vadSubscription?.cancel();
+    _stopTest();
     super.dispose();
   }
 
@@ -55,37 +52,50 @@ class _MyAppState extends State<MyApp> {
     if (_isTestRunning) return;
 
     try {
+      // --- 新增：枚举设备诊断 ---
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      debugPrint('🔍 DEVICE DIAGNOSTICS:');
+      for (var device in devices) {
+        debugPrint(' - Type: ${device.kind}, Label: ${device.label}, ID: ${device.deviceId}');
+      }
+
       await RtcRnnoise.init();
 
       final Map<String, dynamic> constraints = {
-        'audio': {
-          'googNoiseSuppression': false, 
-          'googEchoCancellation': true,
-          'echoCancellation': true,
-        },
+        'audio': true, // 使用最原始的约束，让 WebRTC 自己选择
         'video': false,
       };
       
       _localStream = await navigator.mediaDevices.getUserMedia(constraints);
-
-      // --- 方案 D: 降维打击 ---
-      // 此时 WebRTC 已经初始化，立刻挂载降噪器
-      bool attached = await RtcRnnoise.attach();
-      if (attached) {
-        debugPrint('✅ SUCCESS: RNNoise attached seamlessly!');
-      } else {
-        debugPrint('❌ FAILED: WebRTC controller not found even after getUserMedia');
-      }
+      await Helper.setSpeakerphoneOn(_isSpeakerOn);
 
       _pc1 = await createPeerConnection({});
       _pc2 = await createPeerConnection({});
 
-      _pc1!.onIceCandidate = (candidate) => _pc2?.addCandidate(candidate);
-      _pc2!.onIceCandidate = (candidate) => _pc1?.addCandidate(candidate);
+      List<RTCIceCandidate> pc1Candidates = [];
+      List<RTCIceCandidate> pc2Candidates = [];
+      bool pc1RemoteSet = false;
+      bool pc2RemoteSet = false;
+
+      _pc1!.onIceCandidate = (candidate) async {
+        if (pc2RemoteSet) {
+          await _pc2!.addCandidate(candidate);
+        } else {
+          pc2Candidates.add(candidate);
+        }
+      };
+
+      _pc2!.onIceCandidate = (candidate) async {
+        if (pc1RemoteSet) {
+          await _pc1!.addCandidate(candidate);
+        } else {
+          pc1Candidates.add(candidate);
+        }
+      };
 
       _pc2!.onTrack = (RTCTrackEvent event) {
         if (event.track.kind == 'audio') {
-          Helper.setSpeakerphoneOn(_isSpeakerOn);
+          debugPrint('✅ SUCCESS: Remote audio track is LIVE');
         }
       };
 
@@ -96,10 +106,21 @@ class _MyAppState extends State<MyApp> {
       RTCSessionDescription offer = await _pc1!.createOffer();
       await _pc1!.setLocalDescription(offer);
       await _pc2!.setRemoteDescription(offer);
+      pc2RemoteSet = true;
+      for (var c in pc2Candidates) { await _pc2!.addCandidate(c); }
 
       RTCSessionDescription answer = await _pc2!.createAnswer();
       await _pc2!.setLocalDescription(answer);
       await _pc1!.setRemoteDescription(answer);
+      pc1RemoteSet = true;
+      for (var c in pc1Candidates) { await _pc1!.addCandidate(c); }
+
+      try {
+        bool attached = await RtcRnnoise.attach();
+        if (attached) debugPrint('✅ SUCCESS: RNNoise Hooked into Pipeline');
+      } catch (e) {
+        debugPrint('⚠️ Attach skipped: $e');
+      }
 
       setState(() => _isTestRunning = true);
     } catch (e) {
@@ -112,13 +133,10 @@ class _MyAppState extends State<MyApp> {
     _localStream?.getTracks().forEach((track) => track.stop());
     await _localStream?.dispose();
     _localStream = null;
-
     await _pc1?.close();
     await _pc2?.close();
     _pc1 = null;
     _pc2 = null;
-
-    await Helper.setSpeakerphoneOn(false);
     setState(() {
       _isTestRunning = false;
       _currentVad = 0.0;
@@ -130,92 +148,31 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       home: Scaffold(
-        appBar: AppBar(title: const Text('RNNoise 最终验证 (VAD)')),
-        body: Padding(
-          padding: const EdgeInsets.all(16.0),
+        appBar: AppBar(title: const Text('RNNoise iOS 终极验证')),
+        body: Center(
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Text(_isTestRunning ? '🟢 正在实时回环测试' : '🔴 测试已停止', 
-                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _isTestRunning ? _stopTest : _startLoopbackTest,
-                          icon: Icon(_isTestRunning ? Icons.stop : Icons.play_arrow),
-                          label: Text(_isTestRunning ? '停止测试' : '开始测试'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isTestRunning ? Colors.red[100] : Colors.green[100]
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              Text(_isTestRunning ? '🟢 音频流处理中' : '🔴 已停止', style: const TextStyle(fontSize: 20)),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _isTestRunning ? _stopTest : _startLoopbackTest,
+                child: Text(_isTestRunning ? '停止' : '开始测试'),
+              ),
+              const SizedBox(height: 40),
+              Text('VAD: ${(_currentVad * 100).toInt()}%'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: LinearProgressIndicator(value: _currentVad),
               ),
               const SizedBox(height: 20),
-              Card(
-                color: Colors.blue[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('AI 人声检测 (VAD)', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('${(_currentVad * 100).toInt()}%', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: _currentVad,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _currentVad > 0.8 ? Colors.green : Colors.blue
-                        ),
-                        minHeight: 15,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
               SwitchListTile(
-                title: const Text('扬声器模式'),
-                subtitle: Text(_isSpeakerOn ? '当前：外放' : '当前：耳机/听筒'),
-                secondary: Icon(_isSpeakerOn ? Icons.volume_up : Icons.headset),
-                value: _isSpeakerOn,
-                onChanged: (val) {
-                  setState(() => _isSpeakerOn = val);
-                  Helper.setSpeakerphoneOn(val);
-                },
-              ),
-              SwitchListTile(
-                title: const Text('AI 降噪开关'),
-                subtitle: const Text('控制原生 C++ 核心是否处理数据'),
-                secondary: const Icon(Icons.auto_fix_high),
+                title: const Text('AI 降噪'),
                 value: _isDenoiseEnabled,
                 onChanged: (val) {
                   setState(() => _isDenoiseEnabled = val);
                   RtcRnnoise.setEnabled(val);
                 },
-              ),
-              ListTile(
-                title: const Text('降噪强度'),
-                subtitle: Slider(
-                  value: _mixLevel,
-                  onChanged: (val) {
-                    setState(() => _mixLevel = val);
-                    RtcRnnoise.setSuppressionLevel(val);
-                  },
-                ),
-                trailing: Text('${(_mixLevel * 100).toInt()}%'),
               ),
             ],
           ),
