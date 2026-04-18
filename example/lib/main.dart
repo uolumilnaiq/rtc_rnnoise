@@ -52,17 +52,22 @@ class _MyAppState extends State<MyApp> {
     if (_isTestRunning) return;
 
     try {
-      // --- 新增：枚举设备诊断 ---
-      final devices = await navigator.mediaDevices.enumerateDevices();
-      debugPrint('🔍 DEVICE DIAGNOSTICS:');
-      for (var device in devices) {
-        debugPrint(' - Type: ${device.kind}, Label: ${device.label}, ID: ${device.deviceId}');
-      }
-
+      // 1. 初始化插件
       await RtcRnnoise.init();
 
+      // 2. 获取设备列表 (诊断用)
+      final devices = await navigator.mediaDevices.enumerateDevices();
+      for (var device in devices) {
+        debugPrint('Device: ${device.kind}, Label: ${device.label}');
+      }
+
+      // 3. 配置音频约束 (禁用 WebRTC 原生降噪以测试 AI 效果)
       final Map<String, dynamic> constraints = {
-        'audio': true, // 使用最原始的约束，让 WebRTC 自己选择
+        'audio': {
+          'echoCancellation': true,
+          'noiseSuppression': false,
+          'autoGainControl': true,
+        },
         'video': false,
       };
       
@@ -95,7 +100,7 @@ class _MyAppState extends State<MyApp> {
 
       _pc2!.onTrack = (RTCTrackEvent event) {
         if (event.track.kind == 'audio') {
-          debugPrint('✅ SUCCESS: Remote audio track is LIVE');
+          debugPrint('✅ Remote audio track active');
         }
       };
 
@@ -115,11 +120,12 @@ class _MyAppState extends State<MyApp> {
       pc1RemoteSet = true;
       for (var c in pc1Candidates) { await _pc1!.addCandidate(c); }
 
+      // 4. 关键：注入降噪器
       try {
         bool attached = await RtcRnnoise.attach();
-        if (attached) debugPrint('✅ SUCCESS: RNNoise Hooked into Pipeline');
+        if (attached) debugPrint('✅ RNNoise Attached Successfully');
       } catch (e) {
-        debugPrint('⚠️ Attach skipped: $e');
+        debugPrint('⚠️ Attach failed (Expected on Simulators): $e');
       }
 
       setState(() => _isTestRunning = true);
@@ -148,31 +154,51 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       home: Scaffold(
-        appBar: AppBar(title: const Text('RNNoise iOS 终极验证')),
+        appBar: AppBar(title: const Text('RNNoise v0.2 AI Denoise')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_isTestRunning ? '🟢 音频流处理中' : '🔴 已停止', style: const TextStyle(fontSize: 20)),
+              Text(_isTestRunning ? '🟢 正在实时处理音频' : '🔴 已停止', style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isTestRunning ? _stopTest : _startLoopbackTest,
-                child: Text(_isTestRunning ? '停止' : '开始测试'),
+                child: Text(_isTestRunning ? '停止测试' : '开始降噪测试'),
               ),
               const SizedBox(height: 40),
-              Text('VAD: ${(_currentVad * 100).toInt()}%'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: LinearProgressIndicator(value: _currentVad),
+              const Text('人声检测概率 (VAD)'),
+              const SizedBox(height: 10),
+              Container(
+                width: 300,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: _currentVad,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: _currentVad > 0.7 ? Colors.green : Colors.blue,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: 20),
-              SwitchListTile(
-                title: const Text('AI 降噪'),
-                value: _isDenoiseEnabled,
-                onChanged: (val) {
-                  setState(() => _isDenoiseEnabled = val);
-                  RtcRnnoise.setEnabled(val);
-                },
+              const SizedBox(height: 10),
+              Text('${(_currentVad * 100).toInt()}%'),
+              const SizedBox(height: 40),
+              SizedBox(
+                width: 300,
+                child: SwitchListTile(
+                  title: const Text('AI 降噪开关'),
+                  value: _isDenoiseEnabled,
+                  onChanged: (val) {
+                    setState(() => _isDenoiseEnabled = val);
+                    RtcRnnoise.setEnabled(val);
+                  },
+                ),
               ),
             ],
           ),
