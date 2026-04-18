@@ -3,7 +3,7 @@ Pod::Spec.new do |s|
   s.version          = '0.1.0'
   s.summary          = 'A high-performance AI noise reduction plugin for Flutter WebRTC.'
   s.description      = 'High-performance AI noise reduction based on RNNoise v0.2. Features zero-latency native processing and XCFramework support.'
-  s.homepage         = 'https://github.com/your-username/rtc_rnnoise'
+  s.homepage         = 'https://github.com/uolumilnaiq/rtc_rnnoise'
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Your Company' => 'email@example.com' }
   s.source           = { :path => '.' }

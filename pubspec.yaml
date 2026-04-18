@@ -1,8 +1,8 @@
 name: rtc_rnnoise
 description: A high-performance AI noise reduction plugin for Flutter WebRTC, based on RNNoise. Features real-time VAD and zero-latency native audio processing via pre-compiled binaries.
 version: 0.1.0
-repository: https://github.com/your-username/rtc_rnnoise
-issue_tracker: https://github.com/your-username/rtc_rnnoise/issues
+repository: https://github.com/uolumilnaiq/rtc_rnnoise
+issue_tracker: https://github.com/uolumilnaiq/rtc_rnnoise/issues
 topics:
   - webrtc
   - audio
