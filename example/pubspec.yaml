@@ -1,0 +1,24 @@
+name: rtc_rnnoise_example
+description: "Demonstrates how to use the rtc_rnnoise plugin."
+publish_to: 'none'
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  rtc_rnnoise:
+    path: ../
+  flutter_webrtc: 1.2.1
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
