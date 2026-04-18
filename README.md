@@ -19,7 +19,7 @@ This plugin is a bridge to high-quality open-source audio processing engines. We
 
 | Library | Version / Commit | License | Role |
 | :--- | :--- | :--- | :--- |
-| **[RNNoise](https://github.com/xiph/rnnoise)** | `5a3a59e` (2024-03) | BSD 3-Clause | Core AI noise reduction & VAD engine. |
+| **[RNNoise](https://github.com/xiph/rnnoise)** | `v0.2` (2024-04) | BSD 3-Clause | Core AI noise reduction & VAD engine. |
 | **[SpeexDSP](https://github.com/xiph/speexdsp)** | `1.2.1` | BSD 3-Clause | Pre-processing, Resampling, and Gain control. |
 
 ---
