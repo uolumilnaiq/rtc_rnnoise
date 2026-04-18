@@ -1,19 +1,17 @@
 #import "RtcRnnoisePlugin.h"
 #import "RnnoiseProcessor.h"
+#import <objc/runtime.h>
 
 @implementation RtcRnnoisePlugin {
     FlutterEventSink _eventSink;
 }
 
-// 静态持有当前处理器，供宿主注入
 static RnnoiseProcessor *_activeProcessor = nil;
 
-+ (RnnoiseProcessor *)activeProcessor {
-    return _activeProcessor;
-}
-
-+ (void)setActiveProcessor:(RnnoiseProcessor *)processor {
-    _activeProcessor = processor;
++ (void)sendVadUpdate:(float)vad {
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"RNNoiseVadNotification" 
+                                                        object:nil 
+                                                      userInfo:@{@"vad": @(vad)}];
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -31,31 +29,79 @@ static RnnoiseProcessor *_activeProcessor = nil;
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
     if ([@"init" isEqualToString:call.method]) {
+        if (!_activeProcessor) {
+            _activeProcessor = [[RnnoiseProcessor alloc] init];
+        }
         result(nil);
+    } else if ([@"attach" isEqualToString:call.method]) {
+        // --- 核心注入逻辑 (iOS WebRTC) ---
+        [self attachToWebRTC:result];
     } else if ([@"setEnabled" isEqualToString:call.method]) {
         BOOL enabled = [call.arguments[@"enabled"] boolValue];
-        if (_activeProcessor) {
-            _activeProcessor.enabled = enabled;
-        }
+        if (_activeProcessor) _activeProcessor.enabled = enabled;
         result(nil);
     } else if ([@"setSuppressionLevel" isEqualToString:call.method]) {
         float level = [call.arguments[@"level"] floatValue];
-        if (_activeProcessor) {
-            _activeProcessor.mixLevel = level;
-        }
+        if (_activeProcessor) _activeProcessor.mixLevel = level;
         result(nil);
     } else {
         result(FlutterMethodNotImplemented);
     }
 }
 
-// 供原生 Processor 调用回传 VAD
-+ (void)sendVadUpdate:(float)vad {
-    // 由于 iOS 插件实例通常由 Flutter 管理，我们利用通知或单例寻找实例
-    // 这里简化处理，直接通过单例或静态变量（在实际复杂工程中建议用观察者模式）
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"RNNoiseVadNotification" 
-                                                        object:nil 
-                                                      userInfo:@{@"vad": @(vad)}];
+- (void)attachToWebRTC:(FlutterResult)result {
+    if (!_activeProcessor) {
+        _activeProcessor = [[RnnoiseProcessor alloc] init];
+    }
+
+    // 1. 动态寻找 FlutterWebRTCPlugin
+    Class webRTCPluginClass = NSClassFromString(@"FlutterWebRTCPlugin");
+    if (!webRTCPluginClass) {
+        NSLog(@"[RNNoiseNative] Error: FlutterWebRTCPlugin not found in runtime");
+        result(@(NO));
+        return;
+    }
+
+    // 2. 获取单例
+    SEL sharedSelector = NSSelectorFromString(@"sharedSingleton");
+    if (![webRTCPluginClass respondsToSelector:sharedSelector]) {
+        result(@(NO));
+        return;
+    }
+    
+    id pluginInstance = [webRTCPluginClass performSelector:sharedSelector];
+    if (!pluginInstance) {
+        result(@(NO));
+        return;
+    }
+
+    // 3. 获取音频管理器
+    id audioManager = [pluginInstance valueForKey:@"audioManager"];
+    if (!audioManager) {
+        result(@(NO));
+        return;
+    }
+
+    // 4. 获取 Capture 后处理适配器
+    id adapter = [audioManager valueForKey:@"capturePostProcessingAdapter"];
+    if (!adapter) {
+        result(@(NO));
+        return;
+    }
+
+    // 5. 执行注入 (addProcessing:)
+    SEL addSelector = NSSelectorFromString(@"addProcessing:");
+    if ([adapter respondsToSelector:addSelector]) {
+        // 由于 ARC 对 performSelector:withObject: 的检查，我们使用动态调用
+        IMP imp = [adapter methodForSelector:addSelector];
+        void (*func)(id, SEL, id) = (void *)imp;
+        func(adapter, addSelector, _activeProcessor);
+        
+        NSLog(@"[RNNoiseNative] Successfully attached to iOS WebRTC Capture Pipeline");
+        result(@(YES));
+    } else {
+        result(@(NO));
+    }
 }
 
 #pragma mark - FlutterStreamHandler
@@ -77,7 +123,12 @@ static RnnoiseProcessor *_activeProcessor = nil;
 
 - (void)handleVadNotification:(NSNotification *)notification {
     if (_eventSink) {
-        _eventSink(notification.userInfo[@"vad"]);
+        float vad = [notification.userInfo[@"vad"] floatValue];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self->_eventSink) {
+                self->_eventSink(@(vad));
+            }
+        });
     }
 }
 
