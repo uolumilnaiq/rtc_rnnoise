@@ -8,6 +8,13 @@ class RtcRnnoise {
     await _methodChannel.invokeMethod('init');
   }
 
+  /// 核心：将降噪处理器挂载到 WebRTC 音频管道
+  /// 请在 getUserMedia 或 createPeerConnection 之后调用
+  static Future<bool> attach() async {
+    final bool? success = await _methodChannel.invokeMethod<bool>('attach');
+    return success ?? false;
+  }
+
   static Future<void> setEnabled(bool enabled) async {
     await _methodChannel.invokeMethod('setEnabled', {'enabled': enabled});
   }
@@ -16,7 +23,6 @@ class RtcRnnoise {
     await _methodChannel.invokeMethod('setSuppressionLevel', {'level': level});
   }
 
-  /// 监听实时 VAD 概率流 (0.0 ~ 1.0)
   static Stream<double> get vadStream {
     return _eventChannel.receiveBroadcastStream().map((event) => event as double);
   }

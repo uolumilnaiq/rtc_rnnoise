@@ -68,6 +68,15 @@ class _MyAppState extends State<MyApp> {
       
       _localStream = await navigator.mediaDevices.getUserMedia(constraints);
 
+      // --- 方案 D: 降维打击 ---
+      // 此时 WebRTC 已经初始化，立刻挂载降噪器
+      bool attached = await RtcRnnoise.attach();
+      if (attached) {
+        debugPrint('✅ SUCCESS: RNNoise attached seamlessly!');
+      } else {
+        debugPrint('❌ FAILED: WebRTC controller not found even after getUserMedia');
+      }
+
       _pc1 = await createPeerConnection({});
       _pc2 = await createPeerConnection({});
 

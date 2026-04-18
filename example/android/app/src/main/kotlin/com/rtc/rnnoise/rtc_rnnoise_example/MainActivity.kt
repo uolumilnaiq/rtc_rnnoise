@@ -8,65 +8,51 @@ import com.cloudwebrtc.webrtc.FlutterWebRTCPlugin
 import com.cloudwebrtc.webrtc.audio.AudioProcessingAdapter
 import java.nio.ByteBuffer
 import android.util.Log
-import android.os.Handler
-import android.os.Looper
 
 class MainActivity: FlutterActivity() {
     private var rnnoiseProcessor: RnnoiseProcessor? = null
-    private val handler = Handler(Looper.getMainLooper())
-    private var injectionCount = 0
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
+        // 1. 初始化处理器
         val processor = RnnoiseProcessor()
         rnnoiseProcessor = processor
         RtcRnnoisePlugin.activeProcessor = processor
         
-        startInjectionAttempts(processor)
-    }
-
-    private fun startInjectionAttempts(processor: RnnoiseProcessor) {
-        val runnable = object : Runnable {
-            override fun run() {
+        // 2. 实现挂载协议：当 Dart 调用 attach 时，这里的代码将被执行
+        RtcRnnoisePlugin.attachProvider = object : RtcRnnoisePlugin.AttachProvider {
+            override fun onAttach(): Boolean {
                 try {
                     val plugin = FlutterWebRTCPlugin.sharedSingleton
-                    // 关键修正：通过 plugin.audioProcessingController 获取 (注意它可能是一个 getter)
                     val controller = plugin?.audioProcessingController
-                    
                     if (controller != null) {
                         val webrtcProcessor = object : AudioProcessingAdapter.ExternalAudioFrameProcessing {
-                            override fun initialize(sampleRateHz: Int, numChannels: Int) {
-                                processor.initialize(sampleRateHz, numChannels)
+                            override fun initialize(rate: Int, channels: Int) {
+                                processor.initialize(rate, channels)
                             }
-                            override fun reset(newRate: Int) {
-                                processor.reset(newRate)
+                            override fun reset(rate: Int) {
+                                processor.reset(rate)
                             }
-                            override fun process(numBands: Int, numFrames: Int, buffer: ByteBuffer) {
-                                processor.process(numBands, numFrames, buffer)
+                            override fun process(bands: Int, frames: Int, buffer: ByteBuffer) {
+                                processor.process(bands, frames, buffer)
                             }
                         }
                         controller.capturePostProcessing.addProcessor(webrtcProcessor)
-                        Log.d("RNNoise", "SUCCESS: AI Denoise Injected via correct path!")
-                        return 
+                        Log.d("RNNoise", "SUCCESS: RNNoise attached via Dart Command (Scheme D)!")
+                        return true
                     }
                 } catch (e: Exception) {
-                    Log.e("RNNoise", "Injection error: ${e.message}")
+                    Log.e("RNNoise", "Attach Error: ${e.message}")
                 }
-
-                injectionCount++
-                if (injectionCount < 30) { 
-                    Log.d("RNNoise", "WebRTC not ready yet, retrying... ($injectionCount)")
-                    handler.postDelayed(this, 1000)
-                }
+                return false
             }
         }
-        handler.post(runnable)
     }
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
         RtcRnnoisePlugin.activeProcessor = null
+        RtcRnnoisePlugin.attachProvider = null
         rnnoiseProcessor?.release()
         super.onDestroy()
     }
