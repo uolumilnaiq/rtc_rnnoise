@@ -1,0 +1,3 @@
+/Users/wangxinran/StudioProjects/rtc-rnnoise/ios/build_ios/CMakeFiles/rtc_rnnoise.dir
+/Users/wangxinran/StudioProjects/rtc-rnnoise/ios/build_ios/CMakeFiles/ALL_BUILD.dir
+/Users/wangxinran/StudioProjects/rtc-rnnoise/ios/build_ios/CMakeFiles/ZERO_CHECK.dir

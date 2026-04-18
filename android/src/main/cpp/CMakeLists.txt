@@ -32,8 +32,11 @@ set(SPEEXDSP_SRC
 set(PLUGIN_SRC
     ${CPP_SRC_DIR}/rnnoise_engine.cpp
     ${CPP_SRC_DIR}/rnnoise_api.cpp
-    jni_bridge.cpp
 )
+
+if(ANDROID)
+    list(APPEND PLUGIN_SRC jni_bridge.cpp)
+endif()
 
 include_directories(
     ${CPP_SRC_DIR}
@@ -48,8 +51,13 @@ include_directories(
 # 关键宏定义
 add_definitions(-DHAVE_CONFIG_H -DEXPORT= -DFLOATING_POINT -DRANDOM_PREFIX=rtc_rnnoise_ -DRNNOISE_BUILD)
 
-# 生成动态库
-add_library(rtc_rnnoise SHARED
+# 默认生成动态库，除非指定
+if(NOT LIB_TYPE)
+    set(LIB_TYPE SHARED)
+endif()
+
+# 生成库
+add_library(rtc_rnnoise ${LIB_TYPE}
     ${RNNOISE_SRC}
     ${SPEEXDSP_SRC}
     ${PLUGIN_SRC}
