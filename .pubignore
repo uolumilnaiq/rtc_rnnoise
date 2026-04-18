@@ -1,0 +1,24 @@
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# Build artifacts
+build/
+android/.gradle/
+android/local.properties
+android/build/
+ios/Pods/
+ios/.DS_Store
+ios/DerivedData/
+.dart_tool/
+
+# Temporary files
+.DS_Store
+*.log
+
+# Test-related if you don't want them in the package (optional)
+# test/
+
+# Example folder is USUALLY included but can be excluded if you want to keep the package small. 
+# However, pub.dev likes examples to be included.
