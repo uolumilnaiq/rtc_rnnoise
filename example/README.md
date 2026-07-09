@@ -1,16 +1,23 @@
-# rtc_rnnoise_example
+# rtc_rnnoise example
 
-Demonstrates how to use the rtc_rnnoise plugin.
+A minimal Flutter app demonstrating real-time AI noise reduction via the `rtc_rnnoise` plugin.
 
-## Getting Started
+## What it does
 
-This project is a starting point for a Flutter application.
+- Opens a microphone stream with WebRTC (`getUserMedia`)
+- Injects RNNoise into the audio capture pipeline (pre-QMF wideband PCM on Android, `capturePostProcessingAdapter` on iOS)
+- Displays real-time VAD (Voice Activity Detection) probability
+- Provides a slider to adjust suppression level (0.0 – 1.0)
 
-A few resources to get you started if this is your first Flutter project:
+## Running
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+flutter pub get
+flutter run
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Android requires a physical device or an x86_64 emulator. iOS requires a physical device (WebRTC audio is not supported on Simulator).
+
+## Key file
+
+`lib/main.dart` — full example showing `RtcRnnoise.init()`, `attach()`, `setEnabled()`, `setSuppressionLevel()`, and `vadStream` usage.

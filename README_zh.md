@@ -1,48 +1,48 @@
 # RtcRnnoise
 
-[中文文档](README_zh.md)
+[English](README.md)
 
-**RtcRnnoise** is a high-performance AI noise reduction plugin specifically designed for [Flutter WebRTC](https://github.com/flutter-webrtc/flutter-webrtc).
+**RtcRnnoise** 是一个专为 [Flutter WebRTC](https://github.com/flutter-webrtc/flutter-webrtc) 设计的高性能 AI 降噪插件。
 
-It leverages the [RNNoise](https://github.com/xiph/rnnoise) C core and achieves ultra-low latency audio enhancement through **native injection** into the WebRTC audio capture pipeline — before QuadratureMirror Filter (QMF) processing, so RNNoise receives real wideband PCM on both platforms.
+插件以 [RNNoise](https://github.com/xiph/rnnoise) C 核心为基础，通过**原生注入**到 WebRTC 音频采集管道实现超低延迟降噪——注入点位于 QMF（正交镜像滤波器）处理之前，确保 RNNoise 在 Android 和 iOS 上均能接收到真实宽带 PCM。
 
-## Key Features
+## 核心特性
 
-- **Pre-compiled Binaries** — ships with optimized `.so` (Android) and `XCFramework` (iOS) for all major architectures; no source compilation required.
-- **Native-Level Performance** — audio processing runs entirely in C++, never touching the Flutter UI thread.
-- **Pre-QMF Injection** — audio is intercepted before WebRTC's QMF splits the signal into sub-bands, avoiding phase aliasing artifacts.
-- **Real-time VAD** — provides AI-based Voice Activity Detection probability via an `EventChannel`.
+- **预编译二进制** — 内置优化后的 `.so`（Android）和 `XCFramework`（iOS），无需本地编译源码。
+- **原生层处理** — 音频处理完全在 C++ 层完成，不经过 Flutter UI 线程。
+- **QMF 前注入** — 在 WebRTC QMF 子带分解之前截获音频，避免相位混叠失真。
+- **实时 VAD** — 通过 `EventChannel` 提供 AI 语音活动检测概率。
 
-## Platform Support
+## 平台支持
 
-| Platform | Status | Injection Point |
+| 平台 | 状态 | 注入点 |
 | :--- | :--- | :--- |
-| **Android** | ✅ Stable | `AudioBufferCallback` (pre-QMF wideband PCM, via reflection) |
-| **iOS** | ✅ Stable | `capturePostProcessingAdapter` (wideband float buffer) |
+| **Android** | ✅ 稳定 | `AudioBufferCallback`（QMF 前宽带 PCM，通过反射注入） |
+| **iOS** | ✅ 稳定 | `capturePostProcessingAdapter`（宽带浮点缓冲） |
 
-> iOS Simulator is not supported due to WebRTC SDK limitations. Use a physical device.
+> iOS Simulator 因 WebRTC SDK 限制不支持，需在真机验证。
 
-## Third-party Libraries
+## 第三方库
 
-| Library | Version | License | Role |
+| 库 | 版本 | 许可证 | 用途 |
 | :--- | :--- | :--- | :--- |
-| [RNNoise](https://github.com/xiph/rnnoise) | v0.2 (2024-04) | BSD 3-Clause | AI noise reduction & VAD engine |
-| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 | BSD 3-Clause | Resampling and gain control |
+| [RNNoise](https://github.com/xiph/rnnoise) | v0.2 (2024-04) | BSD 3-Clause | AI 降噪 & VAD 引擎 |
+| [SpeexDSP](https://github.com/xiph/speexdsp) | 1.2.1 | BSD 3-Clause | 重采样与增益控制 |
 
 ---
 
-## Quick Start
+## 快速开始
 
-### 1. Add the dependency
+### 1. 添加依赖
 
 ```yaml
 dependencies:
   rtc_rnnoise: ^0.2.0
 ```
 
-### 2. Android setup — `MainActivity.kt`
+### 2. Android 配置 — `MainActivity.kt`
 
-The plugin injects into `AudioBufferCallback` via reflection to intercept wideband PCM before WebRTC's QMF. Wire up the `AttachProvider` so the injection runs at the right time (after `FlutterWebRTCPlugin` is initialized):
+插件通过反射将 `AudioBufferCallback` 注入 WebRTC 音频采集链路，在 QMF 之前截获宽带 PCM。需在 `configureFlutterEngine` 中注册 `AttachProvider`：
 
 ```kotlin
 import com.rtc.rnnoise.RnnoiseProcessor
@@ -112,28 +112,28 @@ class MainActivity : FlutterActivity() {
 }
 ```
 
-### 3. iOS setup
+### 3. iOS 配置
 
-No additional native code is required. The plugin automatically injects into WebRTC's `capturePostProcessingAdapter` when `RtcRnnoise.attach()` is called from Dart.
+无需额外原生代码。插件在 Dart 调用 `RtcRnnoise.attach()` 时自动注入到 WebRTC 的 `capturePostProcessingAdapter`。
 
-### 4. Dart usage
+### 4. Dart 使用
 
 ```dart
 import 'package:rtc_rnnoise/rtc_rnnoise.dart';
 
-// Call after getUserMedia() / createPeerConnection()
+// 在 getUserMedia() / createPeerConnection() 之后调用
 await RtcRnnoise.init();
 await RtcRnnoise.attach();
 await RtcRnnoise.setEnabled(true);
 await RtcRnnoise.setSuppressionLevel(0.75); // 0.0 – 1.0
 
-// Listen to VAD probability (0.0 – 1.0)
+// 监听 VAD 概率（0.0 – 1.0）
 RtcRnnoise.vadStream.listen((vad) {
   print('VAD: $vad');
 });
 ```
 
-> **Note**: Disable WebRTC's built-in noise suppression and auto gain control to avoid interference with RNNoise:
+> **注意**：建议关闭 WebRTC 内置降噪和自动增益，避免干扰 RNNoise：
 > ```dart
 > mediaConstraints = {
 >   'audio': {
@@ -145,6 +145,6 @@ RtcRnnoise.vadStream.listen((vad) {
 
 ---
 
-## License
+## 许可证
 
-BSD 3-Clause License.
+BSD 3-Clause License。
