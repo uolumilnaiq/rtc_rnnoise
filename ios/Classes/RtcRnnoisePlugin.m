@@ -6,12 +6,17 @@
     FlutterEventSink _eventSink;
 }
 
-static RnnoiseProcessor *_activeProcessor = nil;
+static RnnoiseProcessor    *_activeProcessor    = nil;
+static RtcRnnoisePlugin    *_sharedInstance     = nil;
+static id                   _captureAdapter     = nil;  // 持有已注册的 adapter，用于 removeProcessing:
 
 + (void)sendVadUpdate:(float)vad {
-    [[NSNotificationCenter defaultCenter] postNotificationName:@"RNNoiseVadNotification" 
-                                                        object:nil 
-                                                      userInfo:@{@"vad": @(vad)}];
+    if (isnan(vad) || vad < 0.0f || vad > 1.0f) return;
+    RtcRnnoisePlugin *instance = _sharedInstance;
+    if (!instance || !instance->_eventSink) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (instance->_eventSink) instance->_eventSink(@(vad));
+    });
 }
 
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
@@ -19,6 +24,7 @@ static RnnoiseProcessor *_activeProcessor = nil;
         methodChannelWithName:@"rtc_rnnoise"
         binaryMessenger:[registrar messenger]];
     RtcRnnoisePlugin* instance = [[RtcRnnoisePlugin alloc] init];
+    _sharedInstance = instance;
     [registrar addMethodCallDelegate:instance channel:channel];
 
     FlutterEventChannel* eventChannel = [FlutterEventChannel
@@ -54,82 +60,70 @@ static RnnoiseProcessor *_activeProcessor = nil;
         _activeProcessor = [[RnnoiseProcessor alloc] init];
     }
 
-    // 1. 动态寻找 FlutterWebRTCPlugin
-    Class webRTCPluginClass = NSClassFromString(@"FlutterWebRTCPlugin");
-    if (!webRTCPluginClass) {
-        NSLog(@"[RNNoiseNative] Error: FlutterWebRTCPlugin not found in runtime");
+    // AudioManager 是 flutter_webrtc 内部单例，管理 WebRTC APM 处理链。
+    // capturePostProcessingAdapter 对应 Android 的 capturePostProcessing。
+    Class audioManagerClass = NSClassFromString(@"AudioManager");
+    if (!audioManagerClass) {
+        NSLog(@"[RNNoiseNative] AudioManager class not found");
         result(@(NO));
         return;
     }
-
-    // 2. 获取单例
-    SEL sharedSelector = NSSelectorFromString(@"sharedSingleton");
-    if (![webRTCPluginClass respondsToSelector:sharedSelector]) {
+    SEL sharedSel = NSSelectorFromString(@"sharedInstance");
+    if (![audioManagerClass respondsToSelector:sharedSel]) {
+        NSLog(@"[RNNoiseNative] AudioManager has no sharedInstance");
         result(@(NO));
         return;
     }
-    
-    id pluginInstance = [webRTCPluginClass performSelector:sharedSelector];
-    if (!pluginInstance) {
-        result(@(NO));
-        return;
-    }
-
-    // 3. 获取音频管理器
-    id audioManager = [pluginInstance valueForKey:@"audioManager"];
+    id audioManager = [audioManagerClass performSelector:sharedSel];
     if (!audioManager) {
+        NSLog(@"[RNNoiseNative] AudioManager.sharedInstance is nil");
         result(@(NO));
         return;
     }
 
-    // 4. 获取 Capture 后处理适配器
-    id adapter = [audioManager valueForKey:@"capturePostProcessingAdapter"];
-    if (!adapter) {
+    // 用 respondsToSelector: + performSelector: 代替 valueForKey:，
+    // 避免属性不存在时 KVC 抛出 NSUndefinedKeyException。
+    SEL getterSel = NSSelectorFromString(@"capturePostProcessingAdapter");
+    if (![audioManager respondsToSelector:getterSel]) {
+        NSLog(@"[RNNoiseNative] capturePostProcessingAdapter not found");
+        result(@(NO));
+        return;
+    }
+    id captureAdapter = [audioManager performSelector:getterSel];
+    if (!captureAdapter) {
+        NSLog(@"[RNNoiseNative] capturePostProcessingAdapter is nil");
         result(@(NO));
         return;
     }
 
-    // 5. 执行注入 (addProcessing:)
-    SEL addSelector = NSSelectorFromString(@"addProcessing:");
-    if ([adapter respondsToSelector:addSelector]) {
-        // 由于 ARC 对 performSelector:withObject: 的检查，我们使用动态调用
-        IMP imp = [adapter methodForSelector:addSelector];
-        void (*func)(id, SEL, id) = (void *)imp;
-        func(adapter, addSelector, _activeProcessor);
-        
-        NSLog(@"[RNNoiseNative] Successfully attached to iOS WebRTC Capture Pipeline");
-        result(@(YES));
-    } else {
+    SEL addSel    = NSSelectorFromString(@"addProcessing:");
+    SEL removeSel = NSSelectorFromString(@"removeProcessing:");
+    if (![captureAdapter respondsToSelector:addSel]) {
+        NSLog(@"[RNNoiseNative] addProcessing: not available");
         result(@(NO));
+        return;
     }
+
+    // 防止重复 attach：先移除旧注册，再重新添加。
+    if (_captureAdapter && [_captureAdapter respondsToSelector:removeSel]) {
+        [_captureAdapter performSelector:removeSel withObject:_activeProcessor];
+    }
+    _captureAdapter = captureAdapter;
+    [captureAdapter performSelector:addSel withObject:_activeProcessor];
+    NSLog(@"[RNNoiseNative] ✅ RNNoise registered on capturePostProcessingAdapter");
+    result(@(YES));
 }
 
 #pragma mark - FlutterStreamHandler
 
 - (FlutterError*)onListenWithArguments:(id)arguments eventSink:(FlutterEventSink)events {
     _eventSink = events;
-    [[NSNotificationCenter defaultCenter] addObserver:self 
-                                             selector:@selector(handleVadNotification:) 
-                                                 name:@"RNNoiseVadNotification" 
-                                               object:nil];
     return nil;
 }
 
 - (FlutterError*)onCancelWithArguments:(id)arguments {
-    [[NSNotificationCenter defaultCenter] removeObserver:self];
     _eventSink = nil;
     return nil;
-}
-
-- (void)handleVadNotification:(NSNotification *)notification {
-    if (_eventSink) {
-        float vad = [notification.userInfo[@"vad"] floatValue];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (self->_eventSink) {
-                self->_eventSink(@(vad));
-            }
-        });
-    }
 }
 
 @end

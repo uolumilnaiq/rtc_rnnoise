@@ -44,6 +44,14 @@ ios/Runner/GeneratedPluginRegistrant.m
 src/cpp/third_party/rnnoise/src/config.h
 src/cpp/third_party/speexdsp/config.h
 
+# Build directories (cmake output)
+android/build_*/
+ios/build_*/
+
+# Third-party C source (Binary-Only strategy, not tracked)
+src/cpp/third_party/rnnoise/src/*.c
+src/cpp/third_party/speexdsp/libspeexdsp/*.c
+
 # IDE related
 .idea/
 .vscode/
@@ -54,3 +62,6 @@ src/cpp/third_party/speexdsp/config.h
 # Logs
 *.log
 example/rnnoise_test.log
+
+# Claude Code project instructions (local only)
+CLAUDE.md

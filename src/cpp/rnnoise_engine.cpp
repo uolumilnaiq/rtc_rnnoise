@@ -17,8 +17,22 @@ RnnoiseEngine::~RnnoiseEngine() {
     CleanupResources();
 }
 
-void RnnoiseEngine::EnsureResources(int sample_rate, int num_channels) {
-    if (current_sample_rate_ == sample_rate && current_num_channels_ == num_channels) {
+void RnnoiseEngine::EnsureResources(int sample_rate, int num_channels, int num_samples) {
+    size_t required_samples = num_samples * num_channels;
+    size_t required_48k_samples = 480;
+    if (sample_rate != 48000) {
+        required_48k_samples = (num_samples * 48000 + sample_rate - 1) / sample_rate;
+    } else {
+        required_48k_samples = num_samples;
+    }
+    if (required_48k_samples < 480) {
+        required_48k_samples = 480;
+    }
+
+    if (current_sample_rate_ == sample_rate && 
+        current_num_channels_ == num_channels &&
+        allocated_samples_ >= required_samples &&
+        allocated_48k_samples_ >= required_48k_samples) {
         return;
     }
 
@@ -26,6 +40,8 @@ void RnnoiseEngine::EnsureResources(int sample_rate, int num_channels) {
 
     current_sample_rate_ = sample_rate;
     current_num_channels_ = num_channels;
+    allocated_samples_ = required_samples;
+    allocated_48k_samples_ = required_48k_samples;
 
     int err = 0;
     if (sample_rate != 48000) {
@@ -33,14 +49,11 @@ void RnnoiseEngine::EnsureResources(int sample_rate, int num_channels) {
         downsampler_ = speex_resampler_init(1, 48000, sample_rate, 3, &err);
     }
 
-    // 预分配缓冲区 (考虑 10ms 最大采样率)
-    // 最大 48kHz, 10ms = 480 samples
-    size_t max_samples = 480 * 2; // 考虑立体声
-    float_in_buffer_ = AllocateAligned<float>(max_samples);
-    resampled_48k_buffer_ = AllocateAligned<float>(480);
-    processed_48k_buffer_ = AllocateAligned<float>(480);
+    float_in_buffer_ = AllocateAligned<float>(allocated_samples_);
+    resampled_48k_buffer_ = AllocateAligned<float>(allocated_48k_samples_);
+    processed_48k_buffer_ = AllocateAligned<float>(allocated_48k_samples_);
     delay_line_buffer_ = AllocateAligned<float>(480); 
-    final_float_buffer_ = AllocateAligned<float>(max_samples);
+    final_float_buffer_ = AllocateAligned<float>(allocated_samples_);
 
     // 延迟线初始化 (清零)
     memset(delay_line_buffer_, 0, sizeof(float) * 480);
@@ -63,6 +76,9 @@ void RnnoiseEngine::CleanupResources() {
     processed_48k_buffer_ = nullptr;
     delay_line_buffer_ = nullptr;
     final_float_buffer_ = nullptr;
+
+    allocated_samples_ = 0;
+    allocated_48k_samples_ = 0;
 }
 
 template<typename T>
@@ -81,7 +97,7 @@ T* RnnoiseEngine::AllocateAligned(size_t size) {
 float RnnoiseEngine::Process(AudioBufferPtr buffer, int num_samples, int sample_rate, 
                              int num_channels, AudioFormat format, MemoryLayout layout, 
                              float mix_level) {
-    EnsureResources(sample_rate, num_channels);
+    EnsureResources(sample_rate, num_channels, num_samples);
 
     float vad_prob = 0.0f;
 
@@ -118,27 +134,47 @@ float RnnoiseEngine::Process(AudioBufferPtr buffer, int num_samples, int sample_
     // 3. 采样率适配 (Upsample to 48k)
     float* input_48k = mono_ptr;
     unsigned int in_len = num_samples;
-    unsigned int out_len = 480;
+    unsigned int out_len = allocated_48k_samples_;
     if (sample_rate != 48000 && upsampler_) {
         speex_resampler_process_float(upsampler_, 0, mono_ptr, &in_len, resampled_48k_buffer_, &out_len);
         input_48k = resampled_48k_buffer_;
+    } else {
+        out_len = num_samples;
     }
 
     // 4. RNNoise 处理 + 相位对齐 (Delay Line)
-    // 注意：由于 WebRTC 严格 10ms，input_48k 必定刚好是 480 点
-    vad_prob = rnnoise_process_frame(rnnoise_state_, processed_48k_buffer_, input_48k);
+    // 按 480 采样点分块处理，剩余不足 480 采样点的不处理（直接复制）
+    int num_input_48k = (int)out_len;
+    int processed = 0;
+    while (processed + 480 <= num_input_48k) {
+        float* chunk_in = input_48k + processed;
+        float* chunk_out = processed_48k_buffer_ + processed;
+        
+        vad_prob = rnnoise_process_frame(rnnoise_state_, chunk_out, chunk_in);
 
-    // 干湿混合 (Dry/Wet Mix)
-    // 为了相位对齐，干声必须用上一帧的
-    for (int i = 0; i < 480; ++i) {
-        float dry = delay_line_buffer_[i];
-        delay_line_buffer_[i] = input_48k[i]; // 将当前帧存入延迟线供下一帧使用
-        processed_48k_buffer_[i] = (dry * (1.0f - mix_level)) + (processed_48k_buffer_[i] * mix_level);
+        // 干湿混合 (Dry/Wet Mix)
+        // 为了相位对齐，干声必须用上一帧的
+        for (int i = 0; i < 480; ++i) {
+            float dry = delay_line_buffer_[i];
+            delay_line_buffer_[i] = chunk_in[i]; // 将当前帧存入延迟线供下一帧使用
+            chunk_out[i] = (dry * (1.0f - mix_level)) + (chunk_out[i] * mix_level);
+        }
+        processed += 480;
+    }
+
+    // 对于不足 480 采样点的余数，直接不处理复制过去
+    if (processed < num_input_48k) {
+        float* chunk_in = input_48k + processed;
+        float* chunk_out = processed_48k_buffer_ + processed;
+        int rem = num_input_48k - processed;
+        for (int i = 0; i < rem; ++i) {
+            chunk_out[i] = chunk_in[i];
+        }
     }
 
     // 5. 逆向还原 (Downsample & Upmix & Clamping)
     float* out_resampled = processed_48k_buffer_;
-    unsigned int res_in_len = 480;
+    unsigned int res_in_len = num_input_48k;
     unsigned int res_out_len = num_samples;
     if (sample_rate != 48000 && downsampler_) {
         speex_resampler_process_float(downsampler_, 0, processed_48k_buffer_, &res_in_len, resampled_48k_buffer_, &res_out_len);
@@ -161,13 +197,15 @@ float RnnoiseEngine::Process(AudioBufferPtr buffer, int num_samples, int sample_
             float** out_ptrs = reinterpret_cast<float**>(buffer.non_interleaved_data);
             for (int ch = 0; ch < num_channels; ++ch) {
                 for (int i = 0; i < num_samples; ++i) {
-                    out_ptrs[ch][i] = out_resampled[i * num_channels + ch] / 32768.0f;
+                    float v = out_resampled[i * num_channels + ch] / 32768.0f;
+                    out_ptrs[ch][i] = std::max(-1.0f, std::min(1.0f, v));
                 }
             }
         } else {
             float* out_ptr = static_cast<float*>(buffer.interleaved_data);
             for (int i = 0; i < num_samples * num_channels; ++i) {
-                out_ptr[i] = out_resampled[i] / 32768.0f;
+                float v = out_resampled[i] / 32768.0f;
+                out_ptr[i] = std::max(-1.0f, std::min(1.0f, v));
             }
         }
     }

@@ -1,0 +1,55 @@
+cmake_minimum_required(VERSION 3.10)
+project(rtc_rnnoise C CXX)
+
+set(ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(CPP_SRC_DIR ${ROOT_DIR}/src/cpp)
+set(THIRD_PARTY_DIR ${CPP_SRC_DIR}/third_party)
+
+set(RNNOISE_SRC
+    ${THIRD_PARTY_DIR}/rnnoise/src/celt_lpc.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/denoise.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/kiss_fft.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/nnet.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/nnet_default.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/parse_lpcnet_weights.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/pitch.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/rnn.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/rnnoise_data.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/rnnoise_tables.c
+    ${THIRD_PARTY_DIR}/rnnoise/src/dump_rnnoise_tables.c
+)
+
+set(SPEEX_SRC
+    ${THIRD_PARTY_DIR}/speexdsp/libspeexdsp/resample.c
+)
+
+set(ENGINE_SRC
+    ${CPP_SRC_DIR}/rnnoise_engine.cpp
+    ${CPP_SRC_DIR}/rnnoise_api.cpp
+)
+
+add_library(rtc_rnnoise STATIC
+    ${RNNOISE_SRC}
+    ${SPEEX_SRC}
+    ${ENGINE_SRC}
+)
+
+target_include_directories(rtc_rnnoise PUBLIC
+    ${CPP_SRC_DIR}
+    ${THIRD_PARTY_DIR}/rnnoise/include
+    ${THIRD_PARTY_DIR}/rnnoise
+    ${THIRD_PARTY_DIR}/speexdsp/include
+    ${THIRD_PARTY_DIR}/speexdsp/include/speex
+    ${THIRD_PARTY_DIR}/speexdsp
+)
+
+target_compile_definitions(rtc_rnnoise PRIVATE
+    HAVE_CONFIG_H=1
+    EXPORT=
+    FLOATING_POINT=1
+    RANDOM_PREFIX=rtc_rnnoise_
+    RNNOISE_BUILD=1
+)
+
+set_property(TARGET rtc_rnnoise PROPERTY C_STANDARD 11)
+set_property(TARGET rtc_rnnoise PROPERTY CXX_STANDARD 14)

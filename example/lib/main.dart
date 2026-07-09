@@ -21,7 +21,7 @@ class _MyAppState extends State<MyApp> {
   bool _isTestRunning = false;
   bool _isDenoiseEnabled = true;
   bool _isSpeakerOn = false;
-  double _mixLevel = 1.0;
+  double _mixLevel = 0.5;
   double _currentVad = 0.0;
   StreamSubscription? _vadSubscription;
 
@@ -61,12 +61,11 @@ class _MyAppState extends State<MyApp> {
         debugPrint('Device: ${device.kind}, Label: ${device.label}');
       }
 
-      // 3. 配置音频约束 (禁用 WebRTC 原生降噪以测试 AI 效果)
       final Map<String, dynamic> constraints = {
         'audio': {
           'echoCancellation': true,
           'noiseSuppression': false,
-          'autoGainControl': true,
+          'autoGainControl': false,
         },
         'video': false,
       };
@@ -120,10 +119,15 @@ class _MyAppState extends State<MyApp> {
       pc1RemoteSet = true;
       for (var c in pc1Candidates) { await _pc1!.addCandidate(c); }
 
-      // 4. 关键：注入降噪器
+      // 4. 注入降噪器
       try {
+        await RtcRnnoise.init();
         bool attached = await RtcRnnoise.attach();
-        if (attached) debugPrint('✅ RNNoise Attached Successfully');
+        if (attached) {
+          debugPrint('✅ RNNoise Attached Successfully');
+          await RtcRnnoise.setEnabled(true);
+          await RtcRnnoise.setSuppressionLevel(_mixLevel);
+        }
       } catch (e) {
         debugPrint('⚠️ Attach failed (Expected on Simulators): $e');
       }
@@ -194,10 +198,31 @@ class _MyAppState extends State<MyApp> {
                 child: SwitchListTile(
                   title: const Text('AI 降噪开关'),
                   value: _isDenoiseEnabled,
-                  onChanged: (val) {
+                  onChanged: _isTestRunning ? (val) {
                     setState(() => _isDenoiseEnabled = val);
                     RtcRnnoise.setEnabled(val);
-                  },
+                  } : null,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 300,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('降噪强度: ${(_mixLevel * 100).toInt()}%（越低越自然）'),
+                    Slider(
+                      value: _mixLevel,
+                      min: 0.3,
+                      max: 1.0,
+                      divisions: 14,
+                      label: '${(_mixLevel * 100).toInt()}%',
+                      onChanged: (val) {
+                        setState(() => _mixLevel = val);
+                        RtcRnnoise.setSuppressionLevel(val);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],

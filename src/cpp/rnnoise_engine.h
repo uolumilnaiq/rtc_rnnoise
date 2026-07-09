@@ -25,7 +25,7 @@ public:
 
 private:
     // 初始化资源
-    void EnsureResources(int sample_rate, int num_channels);
+    void EnsureResources(int sample_rate, int num_channels, int num_samples);
     void CleanupResources();
 
     // 内存对齐分配辅助
@@ -46,6 +46,8 @@ private:
 
     int current_sample_rate_ = 0;
     int current_num_channels_ = 0;
+    size_t allocated_samples_ = 0;
+    size_t allocated_48k_samples_ = 0;
     
     // 延迟长度 (RNNoise 内部有 480 点的重叠，这里需要根据算法延迟对齐)
     // 根据 RNNoise 源码，处理是在 480 点 (10ms) 上进行的，存在大约 1 帧的相位偏移
