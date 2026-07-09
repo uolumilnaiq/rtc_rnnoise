@@ -8,15 +8,18 @@ build/
 android/.gradle/
 android/local.properties
 android/build/
-android/build_native/
-android/build_v7a/
-android/build_x86_64/
+android/build_*/
 ios/Pods/
 ios/.DS_Store
 ios/DerivedData/
-ios/build_ios/
-ios/build_sim/
+ios/build_*/
 .dart_tool/
+
+# Planning/design docs (internal use only)
+doc/superpowers/
+
+# CLAUDE.md (local instructions, not for pub users)
+CLAUDE.md
 
 # IMPORTANT: Exclude large C++ source code in Option B
 # We only publish the JNI bridges and the compiled binaries
